@@ -1,0 +1,1661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>УЧИМЕ ЗАЕДНО — Collaborative Learning Intelligence Platform</title>
+
+  <!-- Three.js for 3D landing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <!-- Firebase SDK (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <!-- Storage not used (requires Blaze plan) -->
+
+  <!-- PDF.js for document reading -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+
+  <style>
+    /* ─── RESET & CSS VARIABLES ─── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg:       #07071a;
+      --bg2:      #0f0f28;
+      --bg3:      #161636;
+      --p1:       #7c3aed;
+      --p2:       #4f46e5;
+      --p3:       #06b6d4;
+      --text:     #eeeeff;
+      --muted:    #8888aa;
+      --green:    #10b981;
+      --red:      #ef4444;
+      --border:   rgba(124,58,237,.22);
+      --glow:     0 0 28px rgba(124,58,237,.35);
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .section { display: none; }
+    .section.active { display: block; }
+
+    /* ─────────────────────────────────────
+       LANDING PAGE
+    ───────────────────────────────────── */
+    #landing {
+      position: relative;
+      width: 100vw; height: 100vh;
+      overflow: hidden;
+      background: radial-gradient(ellipse at 40% 60%, #1e0845 0%, #07071a 65%);
+    }
+
+    #three-canvas {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      z-index: 1;
+    }
+
+    .landing-content {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 2;
+      text-align: center;
+      pointer-events: none;
+    }
+
+    .landing-title {
+      font-size: clamp(3.2rem, 9vw, 7.5rem);
+      font-weight: 900;
+      letter-spacing: -3px;
+      line-height: 1.05;
+      background: linear-gradient(135deg, #c4b5fd 0%, #38bdf8 50%, #a78bfa 100%);
+      background-size: 200% 200%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: gradShift 5s ease infinite, floatY 7s ease-in-out infinite;
+      filter: drop-shadow(0 0 40px rgba(124,58,237,.6));
+    }
+
+    .landing-sub {
+      font-size: clamp(1rem, 2.5vw, 1.5rem);
+      color: rgba(167,139,250,.85);
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      margin-top: .9rem;
+      animation: fadeUp .9s ease .4s both;
+    }
+
+    .landing-desc {
+      font-size: .95rem;
+      color: var(--muted);
+      margin-top: .4rem;
+      animation: fadeUp .9s ease .7s both;
+    }
+
+    .landing-btns {
+      margin-top: 2.5rem;
+      display: flex; gap: 1rem; justify-content: center;
+      pointer-events: all;
+      animation: fadeUp .9s ease 1s both;
+    }
+
+    @keyframes gradShift {
+      0%,100% { background-position: 0% 50%; }
+      50%      { background-position: 100% 50%; }
+    }
+    @keyframes floatY {
+      0%,100% { transform: translateY(0); }
+      50%      { transform: translateY(-14px); }
+    }
+    @keyframes fadeUp {
+      from { opacity:0; transform: translateY(22px); }
+      to   { opacity:1; transform: translateY(0); }
+    }
+
+    /* ─────────────────────────────────────
+       BUTTONS
+    ───────────────────────────────────── */
+    .btn {
+      padding: .75rem 2rem;
+      border-radius: 50px;
+      border: none;
+      font-size: .95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .28s ease;
+      display: inline-flex; align-items: center; gap: .45rem;
+      text-decoration: none;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--p1), var(--p2));
+      color: #fff;
+      box-shadow: 0 4px 18px rgba(124,58,237,.45);
+    }
+    .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 10px 28px rgba(124,58,237,.65); }
+    .btn-outline {
+      background: transparent;
+      color: var(--text);
+      border: 2px solid rgba(124,58,237,.5);
+      backdrop-filter: blur(12px);
+    }
+    .btn-outline:hover { background: rgba(124,58,237,.18); border-color: var(--p1); }
+    .btn-sm { padding: .45rem 1.1rem; font-size: .82rem; }
+    .btn-green { background: linear-gradient(135deg,#059669,#10b981); color:#fff; }
+    .btn-red   { background: linear-gradient(135deg,#dc2626,#ef4444); color:#fff; }
+    .btn-ghost { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: .85rem; }
+    .btn-ghost:hover { color: var(--text); }
+    .w-full { width: 100%; justify-content: center; }
+
+    /* ─────────────────────────────────────
+       AUTH
+    ───────────────────────────────────── */
+    #auth-section {
+      min-height: 100vh;
+      display: none; align-items: center; justify-content: center;
+      background: radial-gradient(ellipse at 30% 50%, #1e0845 0%, #07071a 60%);
+      padding: 2rem;
+    }
+    #auth-section.active { display: flex; }
+
+    .auth-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 26px;
+      padding: 3rem;
+      width: 100%; max-width: 460px;
+      box-shadow: var(--glow), 0 28px 55px rgba(0,0,0,.55);
+      animation: slideUp .45s ease;
+    }
+
+    @keyframes slideUp {
+      from { opacity:0; transform: translateY(30px); }
+      to   { opacity:1; transform: translateY(0); }
+    }
+
+    .auth-logo { text-align: center; margin-bottom: 2rem; }
+    .auth-logo h2 {
+      font-size: 2.1rem; font-weight: 900;
+      background: linear-gradient(135deg,#a78bfa,#38bdf8);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .auth-logo p { color: var(--muted); font-size: .85rem; margin-top: .25rem; }
+
+    .auth-tabs {
+      display: flex; background: var(--bg); border-radius: 14px;
+      padding: 4px; margin-bottom: 2rem;
+    }
+    .auth-tab {
+      flex: 1; padding: .6rem; border: none; background: transparent;
+      color: var(--muted); border-radius: 12px; cursor: pointer;
+      font-size: .9rem; font-weight: 700; transition: all .25s;
+    }
+    .auth-tab.active { background: linear-gradient(135deg,var(--p1),var(--p2)); color: #fff; }
+
+    /* ─── FORMS ─── */
+    .form-group { margin-bottom: 1.2rem; }
+    .form-group label { display: block; color: var(--muted); font-size: .82rem; margin-bottom: .45rem; font-weight: 600; }
+
+    .form-control {
+      width: 100%; padding: .82rem 1rem;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 13px; color: var(--text); font-size: .95rem;
+      outline: none; transition: all .25s;
+    }
+    .form-control:focus { border-color: var(--p1); box-shadow: 0 0 0 3px rgba(124,58,237,.16); }
+    .form-control::placeholder { color: #3a3a5a; }
+    textarea.form-control { resize: vertical; min-height: 80px; }
+    select.form-control { cursor: pointer; }
+
+    /* ─────────────────────────────────────
+       SETUP WIZARD
+    ───────────────────────────────────── */
+    #setup-section {
+      min-height: 100vh;
+      display: none; align-items: center; justify-content: center;
+      background: radial-gradient(ellipse at 70% 40%, #1e0845 0%, #07071a 60%);
+      padding: 2rem;
+    }
+    #setup-section.active { display: flex; }
+
+    .setup-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 26px; padding: 3rem;
+      width: 100%; max-width: 620px;
+      box-shadow: var(--glow), 0 28px 55px rgba(0,0,0,.55);
+    }
+
+    .step-dots { display: flex; gap: .5rem; margin-bottom: 2rem; }
+    .step-dot { flex: 1; height: 4px; border-radius: 2px; background: var(--bg3); transition: background .3s; }
+    .step-dot.done { background: var(--p1); }
+
+    .subjects-row { display: flex; gap: .5rem; margin-bottom: .75rem; }
+    .tags-box { display: flex; flex-wrap: wrap; gap: .45rem; min-height: 36px; }
+
+    .tag {
+      padding: .28rem .78rem; border-radius: 20px;
+      font-size: .78rem; font-weight: 700;
+    }
+    .tag-know { background: rgba(16,185,129,.14); color: #10b981; border: 1px solid rgba(16,185,129,.3); }
+    .tag-need { background: rgba(239,68,68,.14);  color: #f87171; border: 1px solid rgba(239,68,68,.3); }
+    .tag-neutral { background: rgba(124,58,237,.14); color: #a78bfa; border: 1px solid rgba(124,58,237,.3); }
+
+    .tag-rm {
+      display: inline-flex; align-items: center; gap: .3rem;
+      padding: .28rem .78rem; border-radius: 20px; font-size: .78rem; font-weight: 700;
+    }
+    .tag-rm button { background: none; border: none; color: inherit; cursor: pointer; font-size: 1rem; line-height: 1; opacity: .65; }
+    .tag-rm button:hover { opacity: 1; }
+
+    /* ─────────────────────────────────────
+       MAIN APP
+    ───────────────────────────────────── */
+    #app-section { min-height: 100vh; display: none; flex-direction: column; }
+    #app-section.active { display: flex; }
+
+    /* TOPBAR */
+    .topbar {
+      position: fixed; top: 0; left: 0; right: 0; height: 62px;
+      background: rgba(7,7,26,.94); backdrop-filter: blur(22px);
+      border-bottom: 1px solid var(--border);
+      z-index: 200;
+      display: flex; align-items: center; padding: 0 1.5rem; gap: 1rem;
+    }
+
+    .logo-text {
+      font-size: 1.05rem; font-weight: 900; white-space: nowrap;
+      background: linear-gradient(135deg,#a78bfa,#38bdf8);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+
+    .topbar-nav { display: flex; gap: .2rem; flex: 1; justify-content: center; }
+
+    .nav-btn {
+      padding: .48rem .9rem; border: none; background: transparent;
+      color: var(--muted); border-radius: 10px; cursor: pointer;
+      font-size: .83rem; font-weight: 700; transition: all .2s;
+      display: flex; align-items: center; gap: .38rem;
+    }
+    .nav-btn:hover { background: rgba(124,58,237,.15); color: var(--text); }
+    .nav-btn.active { background: rgba(124,58,237,.25); color: #a78bfa; }
+
+    .topbar-right { display: flex; align-items: center; gap: .75rem; }
+
+    .lang-pill {
+      padding: .32rem .75rem; background: var(--bg2);
+      border: 1px solid var(--border); border-radius: 20px;
+      color: var(--muted); font-size: .78rem; cursor: pointer; transition: all .2s;
+    }
+    .lang-pill:hover { border-color: var(--p1); color: var(--text); }
+
+    .av-sm {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: linear-gradient(135deg,var(--p1),var(--p2));
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: .88rem; cursor: pointer;
+      overflow: hidden; border: 2px solid transparent; transition: border-color .2s;
+    }
+    .av-sm:hover { border-color: var(--p1); }
+    .av-sm img { width:100%; height:100%; object-fit:cover; }
+
+    /* MAIN CONTENT */
+    .main-content {
+      margin-top: 62px; flex: 1;
+      padding: 2rem; max-width: 1220px;
+      margin-left: auto; margin-right: auto; width: 100%;
+    }
+
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* CARDS */
+    .card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 20px; padding: 1.5rem; transition: all .28s;
+    }
+    .card:hover { border-color: rgba(124,58,237,.42); box-shadow: var(--glow); }
+
+    .section-title {
+      font-size: 1.45rem; font-weight: 800;
+      margin-bottom: 1.5rem;
+      display: flex; align-items: center; gap: .65rem;
+    }
+
+    /* STATS */
+    .stats-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(190px,1fr));
+      gap: 1rem; margin-bottom: 2.5rem;
+    }
+    .stat-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 18px; padding: 1.5rem; text-align: center;
+    }
+    .stat-num {
+      font-size: 2.6rem; font-weight: 900;
+      background: linear-gradient(135deg,#a78bfa,#38bdf8);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .stat-label { color: var(--muted); font-size: .82rem; margin-top: .2rem; }
+
+    /* MATCH CARDS */
+    .match-card {
+      display: flex; align-items: center; gap: 1.2rem;
+      padding: 1.2rem 1.5rem;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 18px; margin-bottom: .9rem; transition: all .28s;
+    }
+    .match-card:hover { border-color: rgba(124,58,237,.5); transform: translateX(5px); box-shadow: var(--glow); }
+
+    .av-md {
+      width: 56px; height: 56px; border-radius: 50%; flex-shrink: 0;
+      background: linear-gradient(135deg,var(--p1),var(--p3));
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 1.3rem; overflow: hidden;
+    }
+    .av-md img { width:100%; height:100%; object-fit:cover; }
+
+    /* MESSAGES */
+    .msgs-layout {
+      display: grid; grid-template-columns: 290px 1fr;
+      gap: 1.2rem; height: calc(100vh - 130px);
+    }
+
+    .chat-sidebar {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 20px; overflow: hidden; display: flex; flex-direction: column;
+    }
+    .chat-sidebar-header {
+      padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--border);
+      font-weight: 800; font-size: .95rem;
+    }
+    .chat-list { flex:1; overflow-y: auto; }
+
+    .chat-item {
+      display: flex; align-items: center; gap: .9rem;
+      padding: .9rem 1.2rem; cursor: pointer;
+      transition: background .18s;
+      border-bottom: 1px solid rgba(124,58,237,.06);
+    }
+    .chat-item:hover  { background: rgba(124,58,237,.09); }
+    .chat-item.active { background: rgba(124,58,237,.18); }
+
+    .av-chat {
+      width: 42px; height: 42px; border-radius: 50%;
+      background: linear-gradient(135deg,var(--p1),var(--p3));
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 1rem; flex-shrink: 0; overflow: hidden;
+    }
+    .av-chat img { width:100%; height:100%; object-fit:cover; }
+
+    .chat-item-name { font-weight: 700; font-size: .88rem; }
+    .chat-item-prev { color: var(--muted); font-size: .77rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .chat-window {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 20px; display: flex; flex-direction: column; overflow: hidden;
+    }
+    .chat-header {
+      padding: 1.1rem 1.5rem; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: .9rem;
+    }
+    .msgs-area {
+      flex:1; overflow-y: auto; padding: 1.4rem;
+      display: flex; flex-direction: column; gap: .65rem;
+    }
+    .message {
+      max-width: 66%; padding: .72rem 1rem; border-radius: 18px;
+      font-size: .9rem; line-height: 1.5; animation: msgPop .18s ease;
+    }
+    @keyframes msgPop {
+      from { opacity:0; transform: scale(.94); }
+      to   { opacity:1; transform: scale(1); }
+    }
+    .msg-sent {
+      align-self: flex-end;
+      background: linear-gradient(135deg,var(--p1),var(--p2));
+      color: #fff; border-bottom-right-radius: 5px;
+    }
+    .msg-recv {
+      align-self: flex-start;
+      background: var(--bg3); border: 1px solid var(--border);
+      border-bottom-left-radius: 5px;
+    }
+    .msg-time { font-size: .68rem; opacity: .55; margin-top: .22rem; text-align: right; }
+
+    .chat-input-row {
+      padding: .9rem 1.4rem; border-top: 1px solid var(--border);
+      display: flex; gap: .65rem;
+    }
+    .chat-input {
+      flex:1; padding: .7rem 1rem;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 12px; color: var(--text); font-size: .9rem;
+      outline: none; transition: border-color .2s;
+    }
+    .chat-input:focus { border-color: var(--p1); }
+    .chat-input::placeholder { color: #3a3a5a; }
+
+    .chat-empty {
+      flex:1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      color: var(--muted); text-align: center; padding: 2rem;
+    }
+
+    /* PROFILE */
+    .profile-hero {
+      background: linear-gradient(135deg, rgba(124,58,237,.18), rgba(79,70,229,.1));
+      border: 1px solid var(--border); border-radius: 24px;
+      padding: 2.5rem; display: flex; gap: 2rem; align-items: flex-start;
+      margin-bottom: 2rem;
+    }
+    .av-lg {
+      width: 104px; height: 104px; border-radius: 50%; flex-shrink: 0;
+      background: linear-gradient(135deg,var(--p1),var(--p3));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2.6rem; font-weight: 700;
+      border: 3px solid rgba(124,58,237,.5);
+      cursor: pointer; position: relative; overflow: hidden;
+    }
+    .av-lg img { width:100%; height:100%; object-fit:cover; }
+    .av-overlay {
+      position: absolute; inset: 0; background: rgba(0,0,0,.5);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.6rem; opacity: 0; transition: opacity .2s;
+    }
+    .av-lg:hover .av-overlay { opacity:1; }
+    .profile-info h2 { font-size: 1.7rem; font-weight: 800; margin-bottom: .45rem; }
+    .profile-info p  { color: var(--muted); margin-bottom: .6rem; }
+
+    /* STUDY AI */
+    .upload-zone {
+      border: 2px dashed rgba(124,58,237,.35); border-radius: 22px;
+      padding: 3.5rem; text-align: center; cursor: pointer;
+      transition: all .3s; background: rgba(124,58,237,.05);
+    }
+    .upload-zone:hover { border-color: var(--p1); background: rgba(124,58,237,.11); }
+    .upload-zone.drag-over { border-color: var(--p3); background: rgba(6,182,212,.1); }
+    .upload-icon { font-size: 4.5rem; margin-bottom: 1rem; }
+
+    /* FLASHCARD */
+    .fc-wrap { perspective: 1200px; max-width: 620px; margin: 0 auto; }
+
+    .flashcard {
+      width:100%; min-height: 210px; position: relative;
+      transform-style: preserve-3d; transition: transform .55s; cursor: pointer;
+    }
+    .flashcard.flipped { transform: rotateY(180deg); }
+
+    .fc-face {
+      position: absolute; width:100%; min-height: 210px;
+      backface-visibility: hidden;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 2rem; border-radius: 22px; text-align: center;
+    }
+    .fc-front {
+      background: linear-gradient(135deg,rgba(124,58,237,.22),rgba(79,70,229,.16));
+      border: 1px solid rgba(124,58,237,.35);
+    }
+    .fc-back {
+      background: linear-gradient(135deg,rgba(6,182,212,.2),rgba(16,185,129,.15));
+      border: 1px solid rgba(6,182,212,.35);
+      transform: rotateY(180deg);
+    }
+    .fc-label { font-size: .72rem; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin-bottom: 1rem; }
+    .fc-text  { font-size: 1.18rem; font-weight: 700; line-height: 1.55; white-space: pre-line; }
+
+    .fc-nav {
+      display: flex; align-items: center; justify-content: center;
+      gap: 1.4rem; margin-top: 2rem;
+    }
+    .fc-counter { font-size: .9rem; color: var(--muted); min-width: 75px; text-align: center; }
+
+    /* PROGRESS BAR */
+    .progress-bar { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; margin: .75rem 0; }
+    .progress-fill { height:100%; background: linear-gradient(90deg,var(--p1),var(--p3)); border-radius: 3px; transition: width .5s ease; }
+
+    /* ALERTS */
+    .alert { padding: .72rem 1rem; border-radius: 12px; font-size: .85rem; margin-bottom: .9rem; animation: fadeIn .3s ease; }
+    .alert-err { background: rgba(239,68,68,.14); border: 1px solid rgba(239,68,68,.3); color: #f87171; }
+    .alert-ok  { background: rgba(16,185,129,.14); border: 1px solid rgba(16,185,129,.3); color: #10b981; }
+    @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
+
+    /* SPINNER */
+    .spinner {
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 3px solid rgba(124,58,237,.18); border-top-color: var(--p1);
+      animation: spin .75s linear infinite; margin: 2rem auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* EMPTY STATE */
+    .empty { text-align: center; padding: 3rem; color: var(--muted); }
+    .empty .emo { font-size: 3rem; margin-bottom: 1rem; }
+
+    /* SCROLLBAR */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: rgba(124,58,237,.4); border-radius: 3px; }
+
+    /* UTILS */
+    .flex { display:flex; } .items-center { align-items:center; }
+    .gap-1{gap:.5rem;} .gap-2{gap:1rem;}
+    .mb-1{margin-bottom:.5rem;} .mb-2{margin-bottom:1rem;} .mb-3{margin-bottom:1.5rem;}
+    .mt-1{margin-top:.5rem;} .mt-2{margin-top:1rem;}
+    .text-sm{font-size:.85rem;} .text-muted{color:var(--muted);}
+    .fw-bold{font-weight:700;} .divider{height:1px;background:var(--border);margin:1.2rem 0;}
+    .online-dot { width:9px; height:9px; background:var(--green); border-radius:50%; display:inline-block; margin-right:4px; animation: pulse 2s ease infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.4;} }
+
+    /* MOBILE */
+    @media(max-width:768px){
+      .msgs-layout { grid-template-columns:1fr; height: auto; }
+      .profile-hero { flex-direction:column; }
+      .topbar-nav { display:none; }
+      .main-content { padding:1rem; }
+    }
+
+    /* NOTIFICATION badge */
+    .badge {
+      background:var(--red); color:#fff; border-radius:50%;
+      width:17px; height:17px; font-size:.62rem;
+      display:inline-flex; align-items:center; justify-content:center; font-weight:700;
+    }
+
+    /* GUILD CARDS */
+    .guild-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 18px; padding: 1.5rem; transition: all .28s; margin-bottom: .9rem;
+      display: flex; align-items: center; gap: 1.2rem;
+    }
+    .guild-card:hover { border-color: rgba(124,58,237,.5); box-shadow: var(--glow); }
+    .guild-icon { font-size: 2.5rem; }
+
+    /* MOBILE NAV BOTTOM (for mobile) */
+    .bottom-nav {
+      display: none;
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: rgba(7,7,26,.97); border-top: 1px solid var(--border);
+      padding: .5rem; z-index: 200; justify-content: space-around;
+    }
+    @media(max-width:768px) {
+      .bottom-nav { display: flex; }
+      .main-content { padding-bottom: 5rem; }
+    }
+    .bot-btn {
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      font-size: .65rem; font-weight: 700; color: var(--muted);
+      background: none; border: none; cursor: pointer; padding: .4rem .6rem;
+      border-radius: 10px; transition: all .2s;
+    }
+    .bot-btn span:first-child { font-size: 1.3rem; }
+    .bot-btn.active { color: #a78bfa; background: rgba(124,58,237,.15); }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════
+     LANDING PAGE
+══════════════════════════════════ -->
+<div id="landing" class="section active">
+  <canvas id="three-canvas"></canvas>
+  <div class="landing-content">
+    <h1 class="landing-title">УЧИМЕ ЗАЕДНО</h1>
+    <p class="landing-sub">Studying Together</p>
+    <p class="landing-desc">Collaborative Learning Intelligence Platform</p>
+    <div class="landing-btns">
+      <button class="btn btn-primary" onclick="showAuth('register')">🚀 <span data-t="getStarted">Get Started</span></button>
+      <button class="btn btn-outline" onclick="showAuth('login')"><span data-t="signIn">Sign In</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     AUTH
+══════════════════════════════════ -->
+<div id="auth-section" class="section">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <h2>УЧИМЕ ЗАЕДНО</h2>
+      <p>Collaborative Learning Intelligence Platform</p>
+    </div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-login"    onclick="switchAuthTab('login')"    data-t="signIn">Sign In</button>
+      <button class="auth-tab"        id="tab-register" onclick="switchAuthTab('register')" data-t="createAccount">Create Account</button>
+    </div>
+
+    <!-- LOGIN -->
+    <div id="login-form">
+      <div id="login-err"></div>
+      <div class="form-group"><label data-t="email">Email</label>
+        <input type="email" class="form-control" id="login-email" placeholder="your@email.com"></div>
+      <div class="form-group"><label data-t="password">Password</label>
+        <input type="password" class="form-control" id="login-pass" placeholder="••••••••"
+          onkeydown="if(event.key==='Enter') doLogin()"></div>
+      <button class="btn btn-primary w-full mt-1" onclick="doLogin()" data-t="signIn">Sign In</button>
+    </div>
+
+    <!-- REGISTER -->
+    <div id="register-form" style="display:none;">
+      <div id="register-err"></div>
+      <div class="form-group"><label data-t="fullName">Full Name</label>
+        <input type="text" class="form-control" id="reg-name" placeholder="Alex Johnson"></div>
+      <div class="form-group"><label data-t="email">Email</label>
+        <input type="email" class="form-control" id="reg-email" placeholder="your@email.com"></div>
+      <div class="form-group"><label data-t="password">Password</label>
+        <input type="password" class="form-control" id="reg-pass" placeholder="At least 6 characters"
+          onkeydown="if(event.key==='Enter') doRegister()"></div>
+      <button class="btn btn-primary w-full mt-1" onclick="doRegister()" data-t="createAccount">Create Account</button>
+    </div>
+
+    <p style="text-align:center;margin-top:1.5rem;">
+      <button class="btn-ghost" onclick="showLanding()" data-t="backToHome">← Back to Home</button>
+    </p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     SETUP WIZARD
+══════════════════════════════════ -->
+<div id="setup-section" class="section">
+  <div class="setup-card">
+    <div style="text-align:center;margin-bottom:1.4rem;">
+      <h2 style="font-size:1.55rem;font-weight:800;" data-t="setupProfile">Setup Your Profile</h2>
+      <p class="text-muted text-sm" data-t="setupDesc">Tell us about yourself to find perfect study partners</p>
+    </div>
+    <div class="step-dots" id="step-dots">
+      <div class="step-dot done" id="sdot-1"></div>
+      <div class="step-dot" id="sdot-2"></div>
+      <div class="step-dot" id="sdot-3"></div>
+    </div>
+
+    <!-- STEP 1 -->
+    <div id="step-1">
+      <h3 style="margin-bottom:1.3rem;" data-t="basicInfo">📋 Basic Information</h3>
+      <div class="form-group"><label data-t="university">University / School</label>
+        <input type="text" class="form-control" id="s-uni" placeholder="e.g. MIT, UKIM, High School..."></div>
+      <div class="form-group"><label data-t="yearLevel">Year / Grade Level</label>
+        <select class="form-control" id="s-year">
+          <option value="">Select...</option>
+          <option>1st Year</option><option>2nd Year</option><option>3rd Year</option>
+          <option>4th Year</option><option>Postgraduate</option><option>High School</option>
+        </select></div>
+      <div class="form-group"><label data-t="bio">Short Bio</label>
+        <textarea class="form-control" id="s-bio" placeholder="Tell others a bit about yourself..."></textarea></div>
+      <button class="btn btn-primary w-full" onclick="gotoStep(2)" data-t="next">Next →</button>
+    </div>
+
+    <!-- STEP 2 -->
+    <div id="step-2" style="display:none;">
+      <h3 style="margin-bottom:.4rem;" data-t="subjectsIKnow">✅ Subjects I Know Well</h3>
+      <p class="text-muted text-sm mb-2" data-t="subjectsIKnowDesc">You can help others with these</p>
+      <div class="subjects-row">
+        <input type="text" class="form-control" id="know-in" placeholder="e.g. Calculus, Python..."
+          onkeydown="if(event.key==='Enter') addSetupTag('know')">
+        <button class="btn btn-green btn-sm" onclick="addSetupTag('know')" data-t="add">Add</button>
+      </div>
+      <div class="tags-box" id="know-tags"></div>
+      <div class="divider"></div>
+      <h3 style="margin-bottom:.4rem;" data-t="subjectsINeed">❓ Subjects I Need Help With</h3>
+      <p class="text-muted text-sm mb-2" data-t="subjectsINeedDesc">Areas where you want support</p>
+      <div class="subjects-row">
+        <input type="text" class="form-control" id="need-in" placeholder="e.g. Organic Chemistry..."
+          onkeydown="if(event.key==='Enter') addSetupTag('need')">
+        <button class="btn btn-red btn-sm" onclick="addSetupTag('need')" data-t="add">Add</button>
+      </div>
+      <div class="tags-box" id="need-tags"></div>
+      <div style="display:flex;gap:1rem;margin-top:1.5rem;">
+        <button class="btn btn-outline" onclick="gotoStep(1)" data-t="back">← Back</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="gotoStep(3)" data-t="next">Next →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div id="step-3" style="display:none;text-align:center;">
+      <h3 style="margin-bottom:.4rem;" data-t="addPhoto">📸 Profile Photo</h3>
+      <p class="text-muted text-sm mb-3" data-t="addPhotoDesc">Help others recognize you (optional)</p>
+      <div id="s-av-preview" style="width:100px;height:100px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#06b6d4);display:flex;align-items:center;justify-content:center;font-size:2.6rem;margin:0 auto 1.4rem;overflow:hidden;">👤</div>
+      <input type="file" id="s-photo-in" accept="image/*" style="display:none;" onchange="previewSetupPhoto(event)">
+      <button class="btn btn-outline mb-3" onclick="document.getElementById('s-photo-in').click()" data-t="choosePhoto">📷 Choose Photo</button>
+      <div id="s3-err"></div>
+      <div style="display:flex;gap:1rem;margin-top:1rem;">
+        <button class="btn btn-outline" onclick="gotoStep(2)" data-t="back">← Back</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="completeSetup()" data-t="letsGo">🚀 Let's Go!</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     MAIN APP
+══════════════════════════════════ -->
+<div id="app-section" class="section">
+
+  <!-- TOPBAR -->
+  <nav class="topbar">
+    <div class="logo-text">УЧИМЕ ЗАЕДНО</div>
+    <div class="topbar-nav">
+      <button class="nav-btn active" id="nav-home"     onclick="showView('home')">🏠 <span data-t="home">Home</span></button>
+      <button class="nav-btn"        id="nav-matches"  onclick="showView('matches')">🤝 <span data-t="matches">Matches</span></button>
+      <button class="nav-btn"        id="nav-messages" onclick="showView('messages')">💬 <span data-t="messages">Messages</span></button>
+      <button class="nav-btn"        id="nav-study"    onclick="showView('study')">📚 <span data-t="studyAI">Study AI</span></button>
+      <button class="nav-btn"        id="nav-profile"  onclick="showView('profile')">👤 <span data-t="profile">Profile</span></button>
+    </div>
+    <div class="topbar-right">
+      <button class="lang-pill" id="lang-btn" onclick="toggleLang()">🌐 MK</button>
+      <div class="av-sm" id="topbar-av" onclick="showView('profile')">U</div>
+    </div>
+  </nav>
+
+  <!-- MAIN CONTENT -->
+  <div class="main-content">
+
+    <!-- ─── HOME ─── -->
+    <div class="view active" id="view-home">
+      <div class="section-title">
+        👋 <span data-t="welcomeBack">Welcome back,</span>
+        <span id="home-name" style="color:#a78bfa;"></span>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-num" id="s-matches">0</div><div class="stat-label" data-t="studyMatches">Study Matches</div></div>
+        <div class="stat-card"><div class="stat-num" id="s-chats">0</div><div class="stat-label" data-t="activeChats">Active Chats</div></div>
+        <div class="stat-card"><div class="stat-num" id="s-know">0</div><div class="stat-label" data-t="subjectsKnown">Subjects Known</div></div>
+        <div class="stat-card"><div class="stat-num" id="s-need">0</div><div class="stat-label" data-t="subjectsLearning">Subjects Learning</div></div>
+      </div>
+      <div class="section-title" style="font-size:1.1rem;">🌟 <span data-t="topMatches">Top Matches for You</span></div>
+      <div id="home-matches"><div class="spinner"></div></div>
+    </div>
+
+    <!-- ─── MATCHES ─── -->
+    <div class="view" id="view-matches">
+      <div class="section-title">🤝 <span data-t="skillExchange">Skill Exchange Matches</span></div>
+      <p class="text-muted mb-3" data-t="matchesDesc">Find students for mutual knowledge exchange</p>
+      <div id="matches-list"><div class="spinner"></div></div>
+    </div>
+
+    <!-- ─── MESSAGES ─── -->
+    <div class="view" id="view-messages">
+      <div class="msgs-layout">
+        <div class="chat-sidebar">
+          <div class="chat-sidebar-header">💬 <span data-t="messages">Messages</span></div>
+          <div class="chat-list" id="chat-list">
+            <div style="padding:1.2rem;color:var(--muted);font-size:.83rem;text-align:center;" data-t="noChatsYet">No conversations yet. Match with someone first!</div>
+          </div>
+        </div>
+        <div class="chat-window" id="chat-window">
+          <div class="chat-empty">
+            <div style="font-size:3rem;margin-bottom:1rem;">💬</div>
+            <p data-t="selectConvo">Select a conversation to start chatting</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── STUDY AI ─── -->
+    <div class="view" id="view-study">
+      <div class="section-title">📚 <span data-t="studyAITitle">AI Study Assistant</span></div>
+      <div id="study-upload">
+        <div class="upload-zone" id="upload-zone"
+          onclick="document.getElementById('doc-file').click()"
+          ondragover="event.preventDefault();this.classList.add('drag-over')"
+          ondragleave="this.classList.remove('drag-over')"
+          ondrop="onFileDrop(event)">
+          <div class="upload-icon">📄</div>
+          <h3 data-t="uploadDoc">Upload a Document</h3>
+          <p data-t="uploadDocDesc">Drag & drop or click — PDF or TXT files</p>
+          <p style="margin-top:.5rem;color:#a78bfa;font-size:.85rem;" data-t="aiWillGenerate">AI generates flashcards automatically ✨</p>
+        </div>
+        <input type="file" id="doc-file" accept=".pdf,.txt" style="display:none;" onchange="onFileInput(event)">
+        <div id="processing" style="display:none;text-align:center;padding:2.5rem;">
+          <div class="spinner"></div>
+          <p data-t="processingDoc">Processing document and generating flashcards...</p>
+        </div>
+      </div>
+
+      <!-- FLASHCARDS -->
+      <div id="flashcards-ui" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+          <div>
+            <h3 id="fc-filename" style="font-weight:800;"></h3>
+            <p class="text-muted text-sm" id="fc-count"></p>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="resetStudy()" data-t="uploadAnother">↩ Upload Another</button>
+        </div>
+
+        <div class="fc-wrap">
+          <div class="flashcard" id="flashcard" onclick="flipCard()">
+            <div class="fc-face fc-front">
+              <div class="fc-label" data-t="question">QUESTION</div>
+              <div class="fc-text" id="fc-q"></div>
+              <p style="color:var(--muted);font-size:.75rem;margin-top:1rem;" data-t="clickToFlip">Click to reveal answer</p>
+            </div>
+            <div class="fc-face fc-back">
+              <div class="fc-label" data-t="answer">ANSWER</div>
+              <div class="fc-text" id="fc-a"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="fc-nav">
+          <button class="btn btn-outline btn-sm" onclick="prevCard()">← <span data-t="prev">Prev</span></button>
+          <span class="fc-counter" id="fc-counter">1 / 1</span>
+          <button class="btn btn-outline btn-sm" onclick="nextCard()"><span data-t="next">Next</span> →</button>
+        </div>
+
+        <div style="margin-top:1.3rem;text-align:center;display:flex;gap:.75rem;justify-content:center;">
+          <button class="btn btn-green btn-sm" onclick="markKnown()" data-t="iKnowThis">✅ I Know This</button>
+          <button class="btn btn-red btn-sm"   onclick="markUnknown()" data-t="stillLearning">❌ Still Learning</button>
+        </div>
+
+        <div style="margin-top:2rem;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:.4rem;">
+            <span class="text-sm text-muted" data-t="progress">Progress</span>
+            <span class="text-sm" id="prog-text">0 / 0 known</span>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+        </div>
+
+        <div style="margin-top:2rem;">
+          <div class="section-title" style="font-size:1rem;">📋 <span data-t="allCards">All Flashcards</span></div>
+          <div id="all-cards"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── PROFILE ─── -->
+    <div class="view" id="view-profile">
+      <div class="profile-hero">
+        <div class="av-lg" id="profile-av" onclick="document.getElementById('p-photo').click()">
+          <span id="p-av-txt">U</span>
+          <img id="p-av-img" src="" style="display:none;">
+          <div class="av-overlay">📷</div>
+        </div>
+        <input type="file" id="p-photo" accept="image/*" style="display:none;" onchange="uploadProfilePhoto(event)">
+        <div class="profile-info">
+          <h2 id="p-name">...</h2>
+          <p id="p-bio" class="text-muted"></p>
+          <p id="p-uni" class="text-muted text-sm"></p>
+          <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.9rem;" id="p-tags"></div>
+          <div style="margin-top:1.1rem;display:flex;gap:.75rem;flex-wrap:wrap;">
+            <button class="btn btn-outline btn-sm" onclick="toggleEditProfile()" data-t="editProfile">✏️ Edit Profile</button>
+            <button class="btn btn-red btn-sm"     onclick="doLogout()" data-t="logout">🚪 Logout</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- EDIT FORM -->
+      <div id="edit-form" style="display:none;" class="card mb-3">
+        <h3 style="margin-bottom:1.4rem;" data-t="editProfile">✏️ Edit Profile</h3>
+        <div class="form-group"><label data-t="university">University / School</label>
+          <input type="text" class="form-control" id="e-uni"></div>
+        <div class="form-group"><label data-t="bio">Bio</label>
+          <textarea class="form-control" id="e-bio"></textarea></div>
+        <div class="mb-2">
+          <label class="text-muted text-sm" data-t="subjectsIKnow">Subjects I Know</label>
+          <div class="subjects-row mt-1">
+            <input type="text" class="form-control" id="e-know-in" placeholder="Add subject..."
+              onkeydown="if(event.key==='Enter') addEditTag('know')">
+            <button class="btn btn-green btn-sm" onclick="addEditTag('know')" data-t="add">Add</button>
+          </div>
+          <div class="tags-box mt-1" id="e-know-tags"></div>
+        </div>
+        <div class="mb-3">
+          <label class="text-muted text-sm" data-t="subjectsINeed">Subjects I Need Help With</label>
+          <div class="subjects-row mt-1">
+            <input type="text" class="form-control" id="e-need-in" placeholder="Add subject..."
+              onkeydown="if(event.key==='Enter') addEditTag('need')">
+            <button class="btn btn-red btn-sm" onclick="addEditTag('need')" data-t="add">Add</button>
+          </div>
+          <div class="tags-box mt-1" id="e-need-tags"></div>
+        </div>
+        <div style="display:flex;gap:1rem;">
+          <button class="btn btn-outline" onclick="toggleEditProfile()" data-t="cancel">Cancel</button>
+          <button class="btn btn-primary" style="flex:1;" onclick="saveProfile()" data-t="saveChanges">Save Changes</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end main-content -->
+
+  <!-- MOBILE BOTTOM NAV -->
+  <div class="bottom-nav">
+    <button class="bot-btn active" id="bnav-home"     onclick="showView('home')"><span>🏠</span><span data-t="home">Home</span></button>
+    <button class="bot-btn"        id="bnav-matches"  onclick="showView('matches')"><span>🤝</span><span data-t="matches">Matches</span></button>
+    <button class="bot-btn"        id="bnav-messages" onclick="showView('messages')"><span>💬</span><span data-t="messages">Messages</span></button>
+    <button class="bot-btn"        id="bnav-study"    onclick="showView('study')"><span>📚</span><span>AI</span></button>
+    <button class="bot-btn"        id="bnav-profile"  onclick="showView('profile')"><span>👤</span><span data-t="profile">Profile</span></button>
+  </div>
+
+</div><!-- end app-section -->
+
+
+<!-- ══════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════ -->
+<script>
+// ┌─────────────────────────────────────────────────────────┐
+// │  FIREBASE CONFIG — REPLACE WITH YOUR OWN VALUES!        │
+// │  Get these from: https://console.firebase.google.com    │
+// └─────────────────────────────────────────────────────────┘
+const firebaseConfig = {
+  apiKey:            "AIzaSyCPk5SNZ7gsAV7yhbS9mHRlH53u-PD4E1c",
+  authDomain:        "uchime-zaedno.firebaseapp.com",
+  projectId:         "uchime-zaedno",
+  storageBucket:     "uchime-zaedno.firebasestorage.app",
+  messagingSenderId: "47139528111",
+  appId:             "1:47139528111:web:e35ba13e47c0ca8e3ba35a",
+  measurementId:     "G-PHGPJG4C70"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+// Storage disabled (requires Blaze plan) — photos stored as base64 in Firestore
+
+// PDF.js worker
+if (typeof pdfjsLib !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+}
+
+// ══════════════════════════════════
+// TRANSLATIONS
+// ══════════════════════════════════
+const TR = {
+  en: {
+    getStarted:'Get Started', signIn:'Sign In', createAccount:'Create Account',
+    email:'Email', password:'Password', fullName:'Full Name', backToHome:'← Back to Home',
+    setupProfile:'Setup Your Profile', setupDesc:'Tell us about yourself to find perfect study partners',
+    basicInfo:'📋 Basic Information', university:'University / School', yearLevel:'Year / Grade Level',
+    bio:'Short Bio', next:'Next →', back:'← Back',
+    subjectsIKnow:'✅ Subjects I Know Well', subjectsIKnowDesc:'You can help others with these',
+    subjectsINeed:'❓ Subjects I Need Help With', subjectsINeedDesc:'Areas where you want support',
+    add:'Add', addPhoto:'📸 Profile Photo', addPhotoDesc:'Help others recognize you (optional)',
+    choosePhoto:'📷 Choose Photo', letsGo:"🚀 Let's Go!",
+    home:'Home', matches:'Matches', messages:'Messages', studyAI:'Study AI', profile:'Profile',
+    welcomeBack:'Welcome back,', studyMatches:'Study Matches', activeChats:'Active Chats',
+    subjectsKnown:'Subjects Known', subjectsLearning:'Subjects Learning',
+    topMatches:'Top Matches for You',
+    skillExchange:'Skill Exchange Matches', matchesDesc:'Find students for mutual knowledge exchange',
+    noChatsYet:'No conversations yet. Match with someone first!',
+    selectConvo:'Select a conversation to start chatting',
+    studyAITitle:'AI Study Assistant', uploadDoc:'Upload a Document',
+    uploadDocDesc:'Drag & drop or click — PDF or TXT files',
+    aiWillGenerate:'AI generates flashcards automatically ✨',
+    processingDoc:'Processing document and generating flashcards...',
+    question:'QUESTION', answer:'ANSWER', prev:'Prev', next2:'Next',
+    iKnowThis:'✅ I Know This', stillLearning:'❌ Still Learning',
+    progress:'Progress', allCards:'All Flashcards', uploadAnother:'↩ Upload Another',
+    editProfile:'✏️ Edit Profile', logout:'🚪 Logout',
+    cancel:'Cancel', saveChanges:'Save Changes', connect:'💬 Message',
+    noMatches:'No matches found yet!', noMatchesDesc:'Add subjects to find matches.',
+    msgPlaceholder:'Type a message...', send:'Send', clickToFlip:'Click to reveal answer',
+    known:'known', of:'/'
+  },
+  mk: {
+    getStarted:'Започни', signIn:'Влез', createAccount:'Направи акаунт',
+    email:'Е-пошта', password:'Лозинка', fullName:'Целосно ime', backToHome:'← Назад',
+    setupProfile:'Постави го твојот профил', setupDesc:'Кажи ни за себе за да најдеме партнери',
+    basicInfo:'📋 Основни информации', university:'Универзитет / Училиште', yearLevel:'Година / Ниво',
+    bio:'Кратко запознавање', next:'Следно →', back:'← Назад',
+    subjectsIKnow:'✅ Предмети кои ги знам', subjectsIKnowDesc:'Предмети во кои можеш да помогнеш',
+    subjectsINeed:'❓ Каде ми треба помош', subjectsINeedDesc:'Области каде барате поддршка',
+    add:'Додај', addPhoto:'📸 Профилна слика', addPhotoDesc:'Помогни другите да те препознаат (опционално)',
+    choosePhoto:'📷 Избери фотографија', letsGo:'🚀 Ајде!',
+    home:'Дома', matches:'Совпаѓања', messages:'Пораки', studyAI:'AI Учење', profile:'Профил',
+    welcomeBack:'Добредојде,', studyMatches:'Совпаѓања', activeChats:'Активни разговори',
+    subjectsKnown:'Предмети кои ги знам', subjectsLearning:'Предмети за учење',
+    topMatches:'Најдобри совпаѓања',
+    skillExchange:'Размена на знаење', matchesDesc:'Студенти за взаемна размена на знаење',
+    noChatsYet:'Сè уште нема разговори. Совпадни со некого!',
+    selectConvo:'Избери разговор за да почнеш',
+    studyAITitle:'AI Асистент за учење', uploadDoc:'Прикачи документ',
+    uploadDocDesc:'Повлечи & пушти или кликни — PDF или TXT',
+    aiWillGenerate:'AI генерира флашкарти автоматски ✨',
+    processingDoc:'Обработка и генерирање на флашкарти...',
+    question:'ПРАШАЊЕ', answer:'ОДГОВОР', prev:'Назад', next2:'Следно',
+    iKnowThis:'✅ Го знам ова', stillLearning:'❌ Сè уште учам',
+    progress:'Напредок', allCards:'Сите флашкарти', uploadAnother:'↩ Прикачи друг',
+    editProfile:'✏️ Уреди профил', logout:'🚪 Излез',
+    cancel:'Откажи', saveChanges:'Зачувај промени', connect:'💬 Порака',
+    noMatches:'Сè уште нема совпаѓања!', noMatchesDesc:'Додај предмети за да најдеш совпаѓања.',
+    msgPlaceholder:'Напиши порака...', send:'Испрати', clickToFlip:'Кликни за одговор',
+    known:'знае', of:'/',
+  }
+};
+
+let lang = 'en';
+function t(k){ return TR[lang][k] || TR.en[k] || k; }
+function applyT(){
+  document.querySelectorAll('[data-t]').forEach(el=>{
+    const v = t(el.getAttribute('data-t'));
+    if(v) el.textContent = v;
+  });
+}
+function toggleLang(){
+  lang = lang==='en'?'mk':'en';
+  document.getElementById('lang-btn').textContent = lang==='en'?'🌐 MK':'🌐 EN';
+  applyT();
+}
+
+// ══════════════════════════════════
+// THREE.JS LANDING
+// ══════════════════════════════════
+let threeRunning = false;
+function initThree(){
+  if(threeRunning) return;
+  threeRunning = true;
+  const canvas = document.getElementById('three-canvas');
+  const scene   = new THREE.Scene();
+  const camera  = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, .1, 1000);
+  camera.position.z = 14;
+  const renderer = new THREE.WebGLRenderer({canvas, alpha:true, antialias:true});
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+
+  // Emoji sprites
+  const emojis = ['📚','🎓','✏️','🔬','💡','🧮','🖥️','📝','🌍','⭐','🏆','🧬','📐','🔭','🎨','📊'];
+  const sprites = [];
+  emojis.forEach(emoji=>{
+    const sz=128, cv=document.createElement('canvas');
+    cv.width=cv.height=sz;
+    const ctx=cv.getContext('2d');
+    ctx.font=`${sz*.82}px serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(emoji,sz/2,sz/2);
+    const mat = new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv), transparent:true});
+    const sp  = new THREE.Sprite(mat);
+    const sc  = 1.1 + Math.random()*1.8;
+    sp.scale.set(sc,sc,1);
+    sp.position.set((Math.random()-.5)*26,(Math.random()-.5)*14,(Math.random()-.5)*6);
+    sp.userData = {
+      vx:(Math.random()-.5)*.007, vy:(Math.random()-.5)*.004,
+      baseY:sp.position.y,
+      fspd:.25+Math.random()*.5, famp:.28+Math.random()*.5,
+      foff:Math.random()*Math.PI*2
+    };
+    scene.add(sp); sprites.push(sp);
+  });
+
+  // Particle field
+  const pg = new THREE.BufferGeometry();
+  const pos = new Float32Array(300*3);
+  for(let i=0;i<pos.length;i++) pos[i]=(Math.random()-.5)*55;
+  pg.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  scene.add(new THREE.Points(pg, new THREE.PointsMaterial({color:0x7c3aed,size:.05,transparent:true,opacity:.55})));
+
+  let t0=0;
+  function animate(){
+    if(!document.getElementById('landing').classList.contains('active')){threeRunning=false;return;}
+    requestAnimationFrame(animate);
+    t0+=.012;
+    sprites.forEach(sp=>{
+      const ud=sp.userData;
+      sp.position.x+=ud.vx;
+      sp.position.y=ud.baseY+Math.sin(t0*ud.fspd+ud.foff)*ud.famp;
+      if(sp.position.x>14) sp.position.x=-14;
+      if(sp.position.x<-14) sp.position.x=14;
+    });
+    renderer.render(scene,camera);
+  }
+  animate();
+  window.addEventListener('resize',()=>{
+    camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth,innerHeight);
+  });
+}
+
+// ══════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════
+function showSection(id){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function showLanding(){ showSection('landing'); initThree(); }
+function showAuth(tab){ showSection('auth-section'); switchAuthTab(tab); applyT(); }
+function switchAuthTab(tab){
+  document.getElementById('login-form').style.display    = tab==='login'    ? 'block':'none';
+  document.getElementById('register-form').style.display = tab==='register' ? 'block':'none';
+  document.getElementById('tab-login').classList.toggle('active', tab==='login');
+  document.getElementById('tab-register').classList.toggle('active', tab==='register');
+}
+
+function showView(name){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn,.bot-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(`view-${name}`).classList.add('active');
+  document.getElementById(`nav-${name}`)?.classList.add('active');
+  document.getElementById(`bnav-${name}`)?.classList.add('active');
+  if(name==='matches')  loadMatches();
+  if(name==='messages') loadChats();
+  if(name==='home')     loadHome();
+  if(name==='profile')  loadProfileView();
+}
+
+// ══════════════════════════════════
+// AUTH
+// ══════════════════════════════════
+async function doLogin(){
+  const em=document.getElementById('login-email').value.trim();
+  const pw=document.getElementById('login-pass').value;
+  const el=document.getElementById('login-err'); el.innerHTML='';
+  if(!em||!pw){ el.innerHTML=`<div class="alert alert-err">Please fill in all fields.</div>`; return; }
+  try{ await auth.signInWithEmailAndPassword(em,pw); }
+  catch(e){ el.innerHTML=`<div class="alert alert-err">${e.message}</div>`; }
+}
+async function doRegister(){
+  const nm=document.getElementById('reg-name').value.trim();
+  const em=document.getElementById('reg-email').value.trim();
+  const pw=document.getElementById('reg-pass').value;
+  const el=document.getElementById('register-err'); el.innerHTML='';
+  if(!nm||!em||!pw){ el.innerHTML=`<div class="alert alert-err">Please fill in all fields.</div>`; return; }
+  try{
+    const cred=await auth.createUserWithEmailAndPassword(em,pw);
+    await cred.user.updateProfile({displayName:nm});
+    await db.collection('users').doc(cred.user.uid).set({
+      displayName:nm, email:em, photoURL:'', bio:'', university:'', year:'',
+      knowSubjects:[], needSubjects:[],
+      createdAt:firebase.firestore.FieldValue.serverTimestamp(), setupDone:false
+    });
+  }catch(e){ el.innerHTML=`<div class="alert alert-err">${e.message}</div>`; }
+}
+async function doLogout(){ await auth.signOut(); showLanding(); }
+
+// ══════════════════════════════════
+// AUTH STATE LISTENER
+// ══════════════════════════════════
+let CU=null, CUD=null;
+auth.onAuthStateChanged(async user=>{
+  if(user){
+    CU=user;
+    const doc=await db.collection('users').doc(user.uid).get();
+    if(doc.exists){
+      CUD=doc.data();
+      if(!CUD.setupDone){ showSection('setup-section'); applyT(); }
+      else enterApp();
+    }
+  } else { CU=null; CUD=null; }
+});
+
+// ══════════════════════════════════
+// SETUP WIZARD
+// ══════════════════════════════════
+let sStep=1, sKnow=[], sNeed=[], sPhotoFile=null;
+
+function gotoStep(n){
+  document.getElementById(`step-${sStep}`).style.display='none';
+  sStep=n;
+  document.getElementById(`step-${sStep}`).style.display='block';
+  for(let i=1;i<=3;i++) document.getElementById(`sdot-${i}`).classList.toggle('done',i<=n);
+}
+
+function addSetupTag(type){
+  const inp=document.getElementById(`${type}-in`);
+  const v=inp.value.trim(); if(!v) return; inp.value='';
+  if(type==='know' && !sKnow.includes(v)){ sKnow.push(v); renderSetupTags('know'); }
+  if(type==='need' && !sNeed.includes(v)){ sNeed.push(v); renderSetupTags('need'); }
+}
+function removeSetupTag(type,v){
+  if(type==='know') sKnow=sKnow.filter(x=>x!==v);
+  else sNeed=sNeed.filter(x=>x!==v);
+  renderSetupTags(type);
+}
+function renderSetupTags(type){
+  const arr=type==='know'?sKnow:sNeed;
+  const cls=type==='know'?'tag-know':'tag-need';
+  document.getElementById(`${type}-tags`).innerHTML=arr.map(v=>
+    `<span class="tag-rm ${cls}">${v}<button onclick="removeSetupTag('${type}','${v}')">×</button></span>`).join('');
+}
+
+function previewSetupPhoto(ev){
+  const f=ev.target.files[0]; if(!f) return;
+  sPhotoFile=f;
+  const r=new FileReader(); r.onload=e=>{
+    document.getElementById('s-av-preview').innerHTML=
+      `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+  }; r.readAsDataURL(f);
+}
+
+async function completeSetup(){
+  const uni=document.getElementById('s-uni').value.trim();
+  const yr =document.getElementById('s-year').value;
+  const bio=document.getElementById('s-bio').value.trim();
+  const err=document.getElementById('s3-err'); err.innerHTML='';
+  try{
+    let photoURL='';
+    if(sPhotoFile){ photoURL = await fileToBase64(sPhotoFile); }
+    await db.collection('users').doc(CU.uid).update({
+      university:uni, year:yr, bio, photoURL,
+      knowSubjects:sKnow, needSubjects:sNeed, setupDone:true
+    });
+    CUD={...CUD,university:uni,year:yr,bio,photoURL,knowSubjects:sKnow,needSubjects:sNeed,setupDone:true};
+    enterApp();
+  }catch(e){ err.innerHTML=`<div class="alert alert-err">${e.message}</div>`; }
+}
+
+// ══════════════════════════════════
+// ENTER APP
+// ══════════════════════════════════
+function enterApp(){
+  showSection('app-section');
+  updateTopbarAv();
+  applyT();
+  loadHome();
+  loadAllUsers();
+}
+function updateTopbarAv(){
+  const el=document.getElementById('topbar-av');
+  if(CUD?.photoURL) el.innerHTML=`<img src="${CUD.photoURL}" style="width:100%;height:100%;object-fit:cover;">`;
+  else el.textContent=(CUD?.displayName||CU?.displayName||'U').charAt(0).toUpperCase();
+}
+
+// ══════════════════════════════════
+// USERS & MATCHING
+// ══════════════════════════════════
+let allUsers=[], myMatches=[];
+async function loadAllUsers(){
+  const snap=await db.collection('users').where('setupDone','==',true).get();
+  allUsers=snap.docs.map(d=>({id:d.id,...d.data()})).filter(u=>u.id!==CU.uid);
+  computeMatches();
+}
+function computeMatches(){
+  if(!CUD) return;
+  const mk=CUD.knowSubjects||[], mn=CUD.needSubjects||[];
+  myMatches=allUsers.map(u=>{
+    const tk=u.knowSubjects||[], tn=u.needSubjects||[];
+    const helpMe = mn.filter(s=>tk.some(x=>x.toLowerCase()===s.toLowerCase()));
+    const helpThem= mk.filter(s=>tn.some(x=>x.toLowerCase()===s.toLowerCase()));
+    return {...u, matchScore:helpMe.length*2+helpThem.length*2, helpMe, helpThem};
+  }).sort((a,b)=>b.matchScore-a.matchScore);
+  document.getElementById('s-matches').textContent=myMatches.filter(m=>m.matchScore>0).length;
+  renderHomeMatches();
+}
+
+// ══════════════════════════════════
+// HOME
+// ══════════════════════════════════
+async function loadHome(){
+  if(!CU||!CUD) return;
+  const nm=(CUD.displayName||CU.displayName||'Student').split(' ')[0];
+  document.getElementById('home-name').textContent=nm;
+  document.getElementById('s-know').textContent=(CUD.knowSubjects||[]).length;
+  document.getElementById('s-need').textContent=(CUD.needSubjects||[]).length;
+  const cs=await db.collection('chats').where('participants','array-contains',CU.uid).get();
+  document.getElementById('s-chats').textContent=cs.size;
+}
+function renderHomeMatches(){
+  const el=document.getElementById('home-matches');
+  const top=myMatches.slice(0,4);
+  if(!top.length){
+    el.innerHTML=`<div class="empty"><div class="emo">🔍</div><p>${t('noMatches')}</p><p class="text-muted text-sm">${t('noMatchesDesc')}</p></div>`;
+    return;
+  }
+  el.innerHTML=top.map(u=>matchCardHTML(u)).join('');
+}
+
+// ══════════════════════════════════
+// MATCHES
+// ══════════════════════════════════
+function loadMatches(){
+  const el=document.getElementById('matches-list');
+  if(!myMatches.length){
+    el.innerHTML=`<div class="empty"><div class="emo">🔍</div><p>${t('noMatches')}</p><p class="text-muted text-sm">${t('noMatchesDesc')}</p></div>`;
+    return;
+  }
+  el.innerHTML=myMatches.map(u=>matchCardHTML(u)).join('');
+}
+function matchCardHTML(u){
+  const init=(u.displayName||'U').charAt(0).toUpperCase();
+  const av=u.photoURL?`<img src="${u.photoURL}" style="width:100%;height:100%;object-fit:cover;">`:`${init}`;
+  const ktags=(u.knowSubjects||[]).slice(0,3).map(s=>`<span class="tag tag-know" style="font-size:.7rem;">${s}</span>`).join('');
+  const ntags=(u.needSubjects||[]).slice(0,3).map(s=>`<span class="tag tag-need" style="font-size:.7rem;">${s}</span>`).join('');
+  const sc=u.matchScore>=4?'#10b981':u.matchScore>=2?'#a78bfa':'#6b7280';
+  const safeName=(u.displayName||'Student').replace(/'/g,"\\'");
+  return `<div class="match-card">
+    <div class="av-md">${av}</div>
+    <div style="flex:1;">
+      <div style="font-weight:800;font-size:1rem;">${u.displayName||'Student'}</div>
+      ${u.university?`<div class="text-muted text-sm">🎓 ${u.university}</div>`:''}
+      <div style="display:flex;flex-wrap:wrap;gap:.28rem;margin-top:.4rem;">${ktags}${ntags}</div>
+    </div>
+    <div style="text-align:right;flex-shrink:0;">
+      <div style="font-size:.8rem;font-weight:700;color:${sc};margin-bottom:.4rem;">⭐ ${u.matchScore} pts</div>
+      <button class="btn btn-primary btn-sm" onclick="startChat('${u.id}','${safeName}')">${t('connect')}</button>
+    </div>
+  </div>`;
+}
+
+// ══════════════════════════════════
+// MESSAGES / CHAT
+// ══════════════════════════════════
+let activeChatId=null, msgListener=null, chatsListener=null;
+
+async function startChat(uid, name){
+  const chatId=[CU.uid,uid].sort().join('_');
+  const ref=db.collection('chats').doc(chatId);
+  if(!(await ref.get()).exists){
+    await ref.set({
+      participants:[CU.uid,uid],
+      names:{[CU.uid]:CUD?.displayName||'Me',[uid]:name},
+      lastMessage:'', updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }
+  showView('messages');
+  openChat(chatId, uid, name);
+}
+
+function loadChats(){
+  const el=document.getElementById('chat-list');
+  if(chatsListener) chatsListener();
+  chatsListener=db.collection('chats').where('participants','array-contains',CU.uid)
+    .orderBy('updatedAt','desc')
+    .onSnapshot(snap=>{
+      if(snap.empty){
+        el.innerHTML=`<div style="padding:1.2rem;color:var(--muted);font-size:.83rem;text-align:center;">${t('noChatsYet')}</div>`;
+        return;
+      }
+      el.innerHTML=snap.docs.map(doc=>{
+        const d=doc.data();
+        const oid=d.participants.find(p=>p!==CU.uid);
+        const oname=d.names?.[oid]||'Student';
+        const init=oname.charAt(0).toUpperCase();
+        const isAct=activeChatId===doc.id;
+        const safe=oname.replace(/'/g,"\\'");
+        return `<div class="chat-item${isAct?' active':''}" onclick="openChat('${doc.id}','${oid}','${safe}')">
+          <div class="av-chat">${init}</div>
+          <div style="flex:1;min-width:0;">
+            <div class="chat-item-name">${oname}</div>
+            <div class="chat-item-prev">${d.lastMessage||'...'}</div>
+          </div>
+        </div>`;
+      }).join('');
+    });
+}
+
+function openChat(chatId, oid, oname){
+  activeChatId=chatId;
+  if(msgListener) msgListener();
+  const win=document.getElementById('chat-window');
+  win.innerHTML=`
+    <div class="chat-header">
+      <div class="av-chat">${oname.charAt(0).toUpperCase()}</div>
+      <div>
+        <div style="font-weight:800;">${oname}</div>
+        <div style="font-size:.72rem;color:var(--muted);"><span class="online-dot"></span>Online</div>
+      </div>
+    </div>
+    <div class="msgs-area" id="msgs-area"></div>
+    <div class="chat-input-row">
+      <input class="chat-input" id="chat-in" placeholder="${t('msgPlaceholder')}" onkeydown="if(event.key==='Enter') sendMsg()">
+      <button class="btn btn-primary btn-sm" onclick="sendMsg()" data-t="send">${t('send')}</button>
+    </div>`;
+
+  msgListener=db.collection('chats').doc(chatId).collection('messages')
+    .orderBy('timestamp').onSnapshot(snap=>{
+      const area=document.getElementById('msgs-area');
+      if(!area) return;
+      area.innerHTML=snap.docs.map(doc=>{
+        const m=doc.data(), mine=m.senderId===CU.uid;
+        const tm=m.timestamp?.toDate?.()?.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})||'';
+        return `<div style="display:flex;flex-direction:column;align-items:${mine?'flex-end':'flex-start'};">
+          <div class="message ${mine?'msg-sent':'msg-recv'}">${escHTML(m.text)}<div class="msg-time">${tm}</div></div>
+        </div>`;
+      }).join('');
+      area.scrollTop=area.scrollHeight;
+    });
+}
+
+async function sendMsg(){
+  const inp=document.getElementById('chat-in');
+  const txt=inp?.value?.trim(); if(!txt||!activeChatId) return;
+  inp.value='';
+  const ref=db.collection('chats').doc(activeChatId);
+  await ref.collection('messages').add({text:txt, senderId:CU.uid, timestamp:firebase.firestore.FieldValue.serverTimestamp()});
+  await ref.update({lastMessage:txt, updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+}
+
+function escHTML(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+// ══════════════════════════════════
+// PROFILE
+// ══════════════════════════════════
+function loadProfileView(){
+  if(!CU||!CUD) return;
+  const name=CUD.displayName||CU.displayName||'Student';
+  document.getElementById('p-name').textContent=name;
+  document.getElementById('p-bio').textContent=CUD.bio||'';
+  document.getElementById('p-uni').textContent=CUD.university?`🎓 ${CUD.university} • ${CUD.year||''}` :'';
+  if(CUD.photoURL){
+    document.getElementById('p-av-txt').style.display='none';
+    const img=document.getElementById('p-av-img'); img.src=CUD.photoURL; img.style.display='block';
+  } else {
+    document.getElementById('p-av-txt').textContent=name.charAt(0).toUpperCase();
+    document.getElementById('p-av-txt').style.display='block';
+    document.getElementById('p-av-img').style.display='none';
+  }
+  const ktags=(CUD.knowSubjects||[]).map(s=>`<span class="tag tag-know">${s}</span>`).join('');
+  const ntags=(CUD.needSubjects||[]).map(s=>`<span class="tag tag-need">${s}</span>`).join('');
+  document.getElementById('p-tags').innerHTML=ktags+ntags;
+}
+
+let eKnow=[], eNeed=[];
+function toggleEditProfile(){
+  const ef=document.getElementById('edit-form');
+  if(ef.style.display==='none'||!ef.style.display){
+    ef.style.display='block';
+    document.getElementById('e-uni').value=CUD?.university||'';
+    document.getElementById('e-bio').value=CUD?.bio||'';
+    eKnow=[...(CUD?.knowSubjects||[])]; eNeed=[...(CUD?.needSubjects||[])];
+    renderEditTags('know'); renderEditTags('need');
+  } else { ef.style.display='none'; }
+}
+function addEditTag(type){
+  const inp=document.getElementById(`e-${type}-in`);
+  const v=inp.value.trim(); if(!v) return; inp.value='';
+  if(type==='know'&&!eKnow.includes(v)){eKnow.push(v);renderEditTags('know');}
+  if(type==='need'&&!eNeed.includes(v)){eNeed.push(v);renderEditTags('need');}
+}
+function removeEditTag(type,v){
+  if(type==='know') eKnow=eKnow.filter(x=>x!==v);
+  else eNeed=eNeed.filter(x=>x!==v);
+  renderEditTags(type);
+}
+function renderEditTags(type){
+  const arr=type==='know'?eKnow:eNeed, cls=type==='know'?'tag-know':'tag-need';
+  document.getElementById(`e-${type}-tags`).innerHTML=arr.map(v=>
+    `<span class="tag-rm ${cls}">${v}<button onclick="removeEditTag('${type}','${v}')">×</button></span>`).join('');
+}
+async function saveProfile(){
+  const uni=document.getElementById('e-uni').value.trim();
+  const bio=document.getElementById('e-bio').value.trim();
+  await db.collection('users').doc(CU.uid).update({university:uni,bio,knowSubjects:eKnow,needSubjects:eNeed});
+  CUD={...CUD,university:uni,bio,knowSubjects:eKnow,needSubjects:eNeed};
+  document.getElementById('edit-form').style.display='none';
+  loadProfileView(); computeMatches();
+}
+async function uploadProfilePhoto(ev){
+  const f=ev.target.files[0]; if(!f) return;
+  try{
+    const url = await fileToBase64(f);
+    await db.collection('users').doc(CU.uid).update({photoURL:url});
+    CUD={...CUD,photoURL:url};
+    loadProfileView(); updateTopbarAv();
+  }catch(e){ alert('Photo upload error: '+e.message); }
+}
+
+// Helper: convert image file to base64 string (no Storage needed)
+function fileToBase64(file){
+  return new Promise((res,rej)=>{
+    // Resize to max 200px to keep Firestore doc small
+    const img=new Image(), reader=new FileReader();
+    reader.onload=e=>{
+      img.onload=()=>{
+        const MAX=200, canvas=document.createElement('canvas');
+        let w=img.width, h=img.height;
+        if(w>h){ if(w>MAX){h=Math.round(h*MAX/w);w=MAX;} }
+        else    { if(h>MAX){w=Math.round(w*MAX/h);h=MAX;} }
+        canvas.width=w; canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        res(canvas.toDataURL('image/jpeg',0.75));
+      };
+      img.onerror=rej;
+      img.src=e.target.result;
+    };
+    reader.onerror=rej;
+    reader.readAsDataURL(file);
+  });
+}
+
+// ══════════════════════════════════
+// STUDY AI — FLASHCARDS
+// ══════════════════════════════════
+let flashcards=[], curCard=0, knownSet=new Set();
+
+function onFileDrop(ev){
+  ev.preventDefault();
+  document.getElementById('upload-zone').classList.remove('drag-over');
+  const f=ev.dataTransfer.files[0]; if(f) processFile(f);
+}
+function onFileInput(ev){ const f=ev.target.files[0]; if(f) processFile(f); }
+
+async function processFile(file){
+  document.getElementById('upload-zone').style.display='none';
+  document.getElementById('processing').style.display='block';
+  let text='';
+  try{
+    if(file.type==='application/pdf') text=await extractPDF(file);
+    else text=await readTxt(file);
+    flashcards=genFlashcards(text);
+    document.getElementById('processing').style.display='none';
+    document.getElementById('flashcards-ui').style.display='block';
+    document.getElementById('fc-filename').textContent=file.name;
+    document.getElementById('fc-count').textContent=`${flashcards.length} flashcards generated`;
+    curCard=0; knownSet=new Set();
+    renderCard(); renderAllCards();
+  }catch(e){ console.error(e); alert('Error: '+e.message); resetStudy(); }
+}
+
+function readTxt(f){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsText(f); }); }
+
+async function extractPDF(file){
+  const ab=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:ab}).promise;
+  let txt='';
+  for(let i=1;i<=Math.min(pdf.numPages,25);i++){
+    const pg=await pdf.getPage(i);
+    const ct=await pg.getTextContent();
+    txt+=ct.items.map(x=>x.str).join(' ')+'\n';
+  }
+  return txt;
+}
+
+function genFlashcards(text){
+  const cards=[];
+  const clean=text.replace(/\s+/g,' ').replace(/[^\w\s.,;:?!()\-]/g,' ').trim();
+  const sents=clean.split(/(?<=[.!?])\s+/).filter(s=>s.length>35&&s.length<480);
+
+  const defRx=[
+    /(.{3,50}?)\s+(?:is defined as|is|are|refers to|means)\s+(.{10,200})/i,
+    /(?:definition[:\s]+)(.{3,50}?)[:\-]\s+(.{10,200})/i
+  ];
+  const stop=new Set(['this','that','with','from','they','them','their','have','been','were','will','when','which','where','there','about','after','before','between','into','through','also','some','most','many','both','each','more','very','just','then','than']);
+
+  sents.forEach((s,i)=>{
+    // Definition cards
+    for(const rx of defRx){
+      const m=s.match(rx);
+      if(m&&m[1].length<55){
+        cards.push({q:`What is ${m[1].trim()}?`, a:m[2].trim().replace(/\.$/,'')});
+        break;
+      }
+    }
+    // Fill-in-the-blank
+    if(i%3===0&&s.length>70){
+      const ws=s.split(' ');
+      if(ws.length>9){
+        const ci=ws.findIndex((w,j)=>j>2&&j<ws.length-2&&w.length>=5&&!stop.has(w.toLowerCase())&&/^[A-Za-z]/.test(w));
+        if(ci!==-1){
+          const bl=[...ws]; const ans=bl[ci].replace(/[.,;:!?]$/,'');
+          bl[ci]='_____';
+          cards.push({q:`Fill in the blank:\n"${bl.join(' ')}"`, a:ans});
+        }
+      }
+    }
+    // Recall question
+    if(i%4===1&&s.length<220){
+      const starters=['What','How','Why','Describe','Explain','When'];
+      cards.push({q:`${starters[i%starters.length]} relates to the following:\n"${s.substring(0,110)}${s.length>110?'...':''}"`, a:s});
+    }
+    // True/False
+    if(i%5===2&&s.length<160){
+      cards.push({q:`True or False:\n"${s}"`, a:'TRUE — this statement is accurate based on the document.'});
+    }
+  });
+
+  // Deduplicate
+  const seen=new Set(), out=[];
+  for(const c of cards){
+    if(!seen.has(c.q)){ seen.add(c.q); out.push(c); }
+  }
+  return out.slice(0,30);
+}
+
+function renderCard(){
+  if(!flashcards.length) return;
+  const c=flashcards[curCard];
+  document.getElementById('fc-q').textContent=c.q;
+  document.getElementById('fc-a').textContent=c.a;
+  document.getElementById('fc-counter').textContent=`${curCard+1} ${t('of')} ${flashcards.length}`;
+  document.getElementById('flashcard').classList.remove('flipped');
+  updateProgress();
+}
+function flipCard(){ document.getElementById('flashcard').classList.toggle('flipped'); }
+function nextCard(){ if(curCard<flashcards.length-1){curCard++;renderCard();} }
+function prevCard(){ if(curCard>0){curCard--;renderCard();} }
+function markKnown(){ knownSet.add(curCard); updateProgress(); renderAllCards(); if(curCard<flashcards.length-1) nextCard(); }
+function markUnknown(){ knownSet.delete(curCard); updateProgress(); renderAllCards(); if(curCard<flashcards.length-1) nextCard(); }
+function updateProgress(){
+  const p=flashcards.length?(knownSet.size/flashcards.length)*100:0;
+  document.getElementById('prog-fill').style.width=p+'%';
+  document.getElementById('prog-text').textContent=`${knownSet.size} / ${flashcards.length} ${t('known')}`;
+}
+function renderAllCards(){
+  document.getElementById('all-cards').innerHTML=flashcards.map((c,i)=>`
+    <div class="card mb-1" style="cursor:pointer;padding:.9rem;" onclick="jumpCard(${i})">
+      <div style="display:flex;align-items:flex-start;gap:.7rem;">
+        <span>${knownSet.has(i)?'✅':'📝'}</span>
+        <div>
+          <div class="text-sm fw-bold" style="color:#a78bfa;">Q${i+1}</div>
+          <div class="text-sm" style="margin-top:.2rem;">${c.q.substring(0,85)}${c.q.length>85?'...':''}</div>
+        </div>
+      </div>
+    </div>`).join('');
+}
+function jumpCard(i){ curCard=i; renderCard(); document.querySelector('.fc-wrap').scrollIntoView({behavior:'smooth'}); }
+function resetStudy(){
+  document.getElementById('upload-zone').style.display='block';
+  document.getElementById('processing').style.display='none';
+  document.getElementById('flashcards-ui').style.display='none';
+  document.getElementById('doc-file').value='';
+  flashcards=[]; curCard=0; knownSet=new Set();
+}
+
+// ══════════════════════════════════
+// INIT
+// ══════════════════════════════════
+document.addEventListener('DOMContentLoaded', ()=>{
+  initThree();
+  applyT();
+});
+</script>
+</body>
+</html>
