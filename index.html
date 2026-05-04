@@ -1200,7 +1200,7 @@ function gotoStep(n){
 
 function addSetupTag(type){
   const inp=document.getElementById(`${type}-in`);
-  const v=inp.value.trim(); if(!v) return; inp.value='';
+  const v=inp.value.trim().toLowerCase(); if(!v) return; inp.value='';
   if(type==='know' && !sKnow.includes(v)){ sKnow.push(v); renderSetupTags('know'); }
   if(type==='need' && !sNeed.includes(v)){ sNeed.push(v); renderSetupTags('need'); }
 }
@@ -1460,7 +1460,7 @@ function toggleEditProfile(){
 }
 function addEditTag(type){
   const inp=document.getElementById(`e-${type}-in`);
-  const v=inp.value.trim(); if(!v) return; inp.value='';
+  const v=inp.value.trim().toLowerCase(); if(!v) return; inp.value='';
   if(type==='know'&&!eKnow.includes(v)){eKnow.push(v);renderEditTags('know');}
   if(type==='need'&&!eNeed.includes(v)){eNeed.push(v);renderEditTags('need');}
 }
