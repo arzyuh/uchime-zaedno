@@ -1265,7 +1265,7 @@ function showView(name){
   if(name==='home')     loadHome();
   if(name==='profile')  loadProfileView();
   if(name==='guilds')   { loadMyGuild(); loadGuilds(); }
-  if(name==='schedule') renderSchedule();
+  if(name==='schedule') loadExamList();
 }
 
 // ══════════════════════════════════
@@ -2052,7 +2052,23 @@ async function addGuildXP(gid){
 // ══════════════════════════════════
 let examList=[];
 
-function addExam(){
+async function saveExamList(){
+  if(!CU) return;
+  try{
+    await db.collection('users').doc(CU.uid).update({ examList });
+  }catch(e){ console.error('saveExamList:', e); }
+}
+
+async function loadExamList(){
+  if(!CU) return;
+  try{
+    const doc=await db.collection('users').doc(CU.uid).get();
+    examList=(doc.data()?.examList)||[];
+    renderSchedule();
+  }catch(e){ console.error('loadExamList:', e); }
+}
+
+async function addExam(){
   const subj=document.getElementById('sched-subject').value.trim();
   const date=document.getElementById('sched-date').value;
   const type=document.getElementById('sched-type').value;
@@ -2061,6 +2077,7 @@ function addExam(){
   examList.push({subj,date,type,diff,id:Date.now()});
   document.getElementById('sched-subject').value='';
   document.getElementById('sched-date').value='';
+  await saveExamList();
   renderSchedule();
 }
 
@@ -2142,8 +2159,9 @@ function renderSchedule(){
   document.getElementById('sched-output').innerHTML=html;
 }
 
-function removeExam(id){
+async function removeExam(id){
   examList=examList.filter(e=>e.id!==id);
+  await saveExamList();
   if(!examList.length) document.getElementById('sched-output').innerHTML=`<div style="text-align:center;padding:2rem;color:var(--muted);"><div style="font-size:2.5rem;">📅</div><p style="margin-top:.75rem;">Add exams above to generate your Power Session plan</p></div>`;
   else renderSchedule();
 }
